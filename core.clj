@@ -22,8 +22,8 @@
 ;; TODO
 ;; 
 ;; * Figure out why the source doesn't show up for most things
-;; * Add collapse/expand functionality
-;; * Remove the whojure dependency
+;; * Add collapse/expand functionality for all namespaces
+;; * Add collapse/expand functionality for each namespace
 ;;
 ;; DONE
 ;;
@@ -33,6 +33,7 @@
 ;; * Add argument lists for functions
 ;; * Add links at the top of each namespace to jump to members
 ;; * Add license statement
+;; * Remove the whojure dependency
 
 (ns com.wangdera.doc-browse.core
   (:require [clojure.contrib.duck-streams :as duck-streams])
@@ -168,7 +169,8 @@ resulting string."
 
 (def *style* ".library-member-source
 {
-  display: none
+  display: none;
+  border-left: solid lightblue 
 }
 .library-member-docs
 {
