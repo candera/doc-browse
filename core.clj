@@ -167,7 +167,12 @@ resulting string."
       // ]]>
 ")
 
-(def *style* ".library-member-source
+(def *style* ".library-member-source-toggle
+{
+  font-size: small;
+  margin-top: 0.5em
+}
+.library-member-source
 {
   display: none;
   border-left: solid lightblue 
@@ -272,8 +277,10 @@ resulting string."
        (if-let [member-source (format-source libid n)] 
 	 [:div {:class "library-member-source-section"}
 	  [:div {:class "library-member-source-toggle"}
+	   "[ "
 	   [:a {:href (format "javascript:toggleSource('%s')" member-source-id)
-		:id member-source-link-id} "Show Source"]]
+		:id member-source-link-id} "Show Source"]
+	   " ]"]	  
 	  [:div {:class "library-member-source" :id member-source-id}
 	   [:pre member-source]]]))]]])
 
