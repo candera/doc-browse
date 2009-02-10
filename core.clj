@@ -250,7 +250,8 @@ resulting string."
 
 (defn- format-source [libid memberid]
   (try
-   (get-source memberid)
+   (if-let [ns (find-ns libid)]
+     (get-source (symbol (name (ns-name ns)) (name memberid))))
    (catch Exception ex
      nil)))
 
@@ -277,12 +278,22 @@ resulting string."
 	   [:pre member-source]]]))]]])
 
 (defn- anchor-for-library [id]
+  "Given a symbol id identifying a namespace, returns an identifier
+suitable for use as the name attribute of an HTML anchor tag."
   (str "library-" id))
 
 (defn- generate-lib-member-link [libid [n v]]
-  [:a {:class "lib-member-link" :href (str "#" (anchor-for-member libid n))} (name n)])
+  "Emits a hyperlink to a member of a namespace given libid (a symbol
+  identifying the namespace) and the vector [n v], where n is the
+  symbol naming the member in question and v is the var pointing to
+  the member." 
+  [:a
+   {:class "lib-member-link" :href (str "#" (anchor-for-member libid
+							       n))} (name n)])
 
 (defn- generate-lib-doc [lib]
+  "Emits the HTML that documents the namespace identified by the
+symbol lib."
   (let [ns (find-ns lib)]
     (if ns 
       (let [lib-members (sort (ns-publics ns))]
@@ -297,20 +308,26 @@ resulting string."
         [:div {:class "library-name"} (name lib)] "Could not load library"])))
 
 (defn- load-lib [lib]
+  "Calls require on the library identified by lib, eating any
+exceptions."
   (try 
    (require lib)
    (catch java.lang.Exception x
        nil)))
 
 (defn- generate-lib-link [lib]
+  "Generates a hyperlink to the documentation for a namespace given
+lib, a symbol identifying that namespace."
   (let [ns (find-ns lib)]
     (if ns
       [:a {:class "lib-link" :href (str "#" (anchor-for-library lib))} (str (ns-name ns))])))
 
-(defn- generate-lib-links [lib-vec]
+(defn- generate-lib-links [libs]
+  "Generates the list of hyperlinks to each namespace, given libs, a
+vector of symbols naming namespaces."
   (into [:div {:class "lib-links"} 
 	 [:div {:class "lib-link-header"} "Namespaces"]] 
-	(interpose " " (map generate-lib-link lib-vec))))
+	(interpose " " (map generate-lib-link libs))))
 
 (defn generate-documentation [libs]
   "Returns a string which is the HTML documentation for the libraries
@@ -338,7 +355,7 @@ emits the generated HTML to the path named by path."
    ['clojure.contrib.accumulators])
 
   (generate-documentation-to-file 
-   "C:/temp/clj-docs.html"
+   "C:/temp/clj-libs.html"
    [
     'clojure.set
     'clojure.main 
