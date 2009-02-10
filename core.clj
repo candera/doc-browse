@@ -21,12 +21,13 @@
 
 ;; TODO
 ;; 
-;; * Figure out why the source doesn't show up for most things
+;; * See if converting to use clojure.contrib.prxml is possible
 ;; * Add collapse/expand functionality for all namespaces
 ;; * Add collapse/expand functionality for each namespace
 ;;
 ;; DONE
 ;;
+;; * Figure out why the source doesn't show up for most things
 ;; * Add collapsible source
 ;; * Add links at the top to jump to each namespace
 ;; * Add object type (var, function, whatever)
@@ -167,7 +168,11 @@ resulting string."
       // ]]>
 ")
 
-(def *style* ".library-member-source-toggle
+(def *style* ".library-member-doc-whitespace
+{
+ white-space: pre
+}
+.library-member-source-toggle
 {
   font-size: small;
   margin-top: 0.5em
@@ -229,7 +234,13 @@ resulting string."
 
 (defn- extract-documentation [v]
   (if-let [docs (:doc (meta v))]
-    (map (fn [l] [:div {:class "library-member-doc-line"} l]) (re-split #"\n" docs)) 
+    (map 
+     (fn [l] 
+       [:div {:class "library-member-doc-line"} 
+	(if (= 0 (count l)) 
+	  [:span {:class "library-member-doc-whitespace"} " "] ; We need something here to make the blank line show up
+	  l)]) 
+     (re-split #"\n" docs)) 
     ""))
 
 (defn- member-type [x]
