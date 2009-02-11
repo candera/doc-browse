@@ -21,12 +21,16 @@
 
 ;; TODO
 ;; 
-;; * See if converting to use clojure.contrib.prxml is possible
 ;; * Add collapse/expand functionality for all namespaces
 ;; * Add collapse/expand functionality for each namespace
+;; * Move to clojure.contrib
+;;   * Change namespace
+;;   * Change license as appropriate
+;;   * Double-check doc strings
 ;;
 ;; DONE
 ;;
+;; * See if converting to use clojure.contrib.prxml is possible
 ;; * Figure out why the source doesn't show up for most things
 ;; * Add collapsible source
 ;; * Add links at the top to jump to each namespace
@@ -38,96 +42,8 @@
 
 (ns com.wangdera.doc-browse.core
   (:require [clojure.contrib.duck-streams :as duck-streams])
-  (:use [clojure.contrib seq-utils str-utils repl-utils def])
+  (:use [clojure.contrib seq-utils str-utils repl-utils def prxml])
   (:import [java.lang Exception]))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; HTML generation stuff
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(def *xml-event-factory* nil) 
-
-(defmacro- write-to-xml-writer [xml-writer & args]
-  `(. ~xml-writer (add (. *xml-event-factory* ~@args))))
-
-(defn- write-start-element [xml-writer element-name]
-  (write-to-xml-writer xml-writer (createStartElement "" "" element-name)))
-
-(defn- write-end-element [xml-writer element-name]
-  (write-to-xml-writer xml-writer (createEndElement "" "" element-name)))
-
-(defn- write-attribute [xml-writer name value]
-  (write-to-xml-writer xml-writer (createAttribute name value)))
-
-(defn- write-text [xml-writer text]
-  (write-to-xml-writer xml-writer (createCharacters text)))
-
-(defn- strcat 
-  ([] (str))
-  ([x y]
-     (. x (concat y)))
-  ([x y & zs]
-     (strcat (strcat x y) (reduce strcat zs))))
-
-(defn- item-type 
-  ([item] 
-     (item-type nil item))
-  
-  ([x item]
-     (cond (string? item) :string
-	   (keyword? item) :keyword
-	   (map? item) :map
-	   (coll? item) :collection
-	   :else :unknown)))
-
-(defmulti html 
-  item-type) 
-
-(defmethod html :string 
-  ([xml-writer item]
-     (write-text xml-writer item)))
-
-(defmethod html :collection 
-  ([xml-writer item]
-     (let [element-name (name (first item))]
-       (write-start-element xml-writer element-name)
-       (dorun (map #(html xml-writer %) (rest item)))
-       (write-end-element xml-writer element-name))))
-
-(defmethod html :map 
-  ([xml-writer item]
-     (dorun (map #(write-attribute xml-writer (name (first %)) (second %)) item))))
-
-(defmethod html :keyword 
-  ([xml-writer item]
-     (write-start-element xml-writer (name item))))
-
-(defmethod html :unknown 
-  ([xml-writer item]))
-
-(defn- create-xml-writer [stream]
-  (let [output-factory (. javax.xml.stream.XMLOutputFactory (newInstance))]
-    (. output-factory (createXMLEventWriter stream))))
-    
-(defn- create-xml-event-factory []
-  (. javax.xml.stream.XMLEventFactory (newInstance)))
-
-(defn- html-output-to-string 
-  "Creates a new XML Writer over a StringWriter and calls html
-on it, then calls toString on the StringWriter, returning the 
-resulting string." 
-  [expr]
-  (let [stream (new java.io.StringWriter) 
-	xml-writer (create-xml-writer stream)]
-     (binding [*xml-event-factory* (create-xml-event-factory)]
-       (html xml-writer expr)
-       (. xml-writer (flush))
-       (. xml-writer (close))
-       (. stream (toString)))))
-
-(defn- with-html-output [xml-writer expr]
-  (binding [*xml-event-factory* (create-xml-event-factory)]
-    (html xml-writer expr)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Doc generation constants
@@ -353,15 +269,19 @@ vector of symbols naming namespaces."
 named by libs. Libs is a vector of symbols identifying Clojure
 libraries."
   (dorun (map load-lib libs))
-  (html-output-to-string 
-   [:html {:xmlns "http://www.w3.org/1999/xhtml"}
-    [:head 
-     [:title "Clojure documentation browser"]
-     [:style *style*]
-     [:script {:language "JavaScript" :type "text/javascript"} *script*]]
-    (let [lib-vec (sort libs)] 
-      (into [:body (generate-lib-links lib-vec)]
-	    (map generate-lib-doc lib-vec)))]))
+  (let [writer (new java.io.StringWriter)]
+   (binding [*out* writer] 
+     (prxml 
+      [:html {:xmlns "http://www.w3.org/1999/xhtml"}
+       [:head 
+	[:title "Clojure documentation browser"]
+	[:style *style*]
+	[:script {:language "JavaScript" :type "text/javascript"} [:raw! *script*]]]
+       (let [lib-vec (sort libs)] 
+	 (into [:body (generate-lib-links lib-vec)]
+	       (map generate-lib-doc lib-vec)))]))
+   (.toString writer)))
+
 
 (defn generate-documentation-to-file [path libs]
   "Calls generate-documentation on the libraries named by libs and
