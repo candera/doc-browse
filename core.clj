@@ -229,7 +229,8 @@ resulting string."
 
 .library-member-name
 {
-  font-weight: bold
+  font-weight: bold;
+  font-size: 105%
 }")
 
 (defn- extract-documentation [v]
