@@ -22,7 +22,6 @@
 ;; TODO
 ;; 
 ;; * Remove doc strings from source code
-;; * Add collapse/expand functionality for each namespace
 ;; * Add collapse/expand functionality for all namespaces
 ;; * Move to clojure.contrib
 ;;   * Change namespace
@@ -31,6 +30,7 @@
 ;;
 ;; DONE
 ;;
+;; * Add collapse/expand functionality for each namespace
 ;; * See if converting to use clojure.contrib.prxml is possible
 ;; * Figure out why the source doesn't show up for most things
 ;; * Add collapsible source
@@ -51,6 +51,35 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def *script* " // <![CDATA[
+
+function setDisplayStyle(id,displayStyle)
+{
+  var elem
+
+  if( document.getElementById )
+  {
+    elem = document.getElementById( id )
+  }
+  else if ( document.all )
+  {
+    elem = eval( 'document.all.' + id )
+  }
+  else
+    return false;
+
+  elem.style.display = displayStyle
+
+}
+
+function collapse(id)
+{
+  setDisplayStyle (id, 'none')
+}
+
+function expand (id)
+{
+  setDisplayStyle (id, 'block')
+}
 
 function toggleSource( id )
 {
@@ -90,15 +119,16 @@ function toggle(targetid, linkid, textWhenOpen, textWhenClosed)
       // ]]>
 ")
 
-(def *style* ".library
+(def *style* "
+.library
 {
   padding: 0.5em 0 0 0 
 }
-.library-contents-toggle
+.all-libs-toggle,.library-contents-toggle
 {
  font-size: small;
 }
-.library-contents-toggle a
+.all-libs-toggle a,.library-contents-toggle a
 {
  color: white
 }
@@ -297,8 +327,28 @@ lib, a symbol identifying that namespace."
   "Generates the list of hyperlinks to each namespace, given libs, a
 vector of symbols naming namespaces."
   (into [:div {:class "lib-links"} 
-	 [:div {:class "lib-link-header"} "Namespaces"]] 
+	 [:div {:class "lib-link-header"} "Namespaces"
+	  [:span {:class "all-libs-toggle"} 
+	   " [ "
+	   [:a {:href "javascript:expandAllNamespaces()"}
+	    "Expand All"]
+	   " ] [ "
+	   [:a {:href "javascript:collapseAllNamespaces()"}
+	    "Collapse All"]
+	   " ]"]]] 
 	(interpose " " (map generate-lib-link libs))))
+
+(defn generate-toggle-namespace-script [action lib]
+  (format "%s('%s');\n" action (anchor-for-library-contents lib)))
+
+(defn generate-all-namespaces-action-script [action libs]
+  (str (format  "function %sAllNamespaces()" action)
+       \newline
+       "{"
+       \newline
+       (reduce str (map #(generate-toggle-namespace-script action %) libs))
+       \newline
+       "}"))
 
 (defn generate-documentation [libs]
   "Returns a string which is the HTML documentation for the libraries
@@ -312,7 +362,15 @@ libraries."
        [:head 
 	[:title "Clojure documentation browser"]
 	[:style *style*]
-	[:script {:language "JavaScript" :type "text/javascript"} [:raw! *script*]]]
+	[:script {:language "JavaScript" :type "text/javascript"} [:raw! *script*]]
+	
+;; 	[:script {:language "JavaScript" :type "text/javascript"}
+;; 	 [:raw! "// <![CDATA[!" \newline]
+;; 	 (generate-all-namespaces-action-script "expand" libs)
+;; 	 (generate-all-namespaces-action-script "collapse" libs)
+;; 	 [:raw! \newline "// ]]>"]]
+
+]
        (let [lib-vec (sort libs)] 
 	 (into [:body (generate-lib-links lib-vec)]
 	       (map generate-lib-doc lib-vec)))]))
