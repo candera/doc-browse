@@ -52,23 +52,37 @@
 
 (def *script* " // <![CDATA[
 
-function setDisplayStyle(id,displayStyle)
+function getElem(id)
 {
-  var elem
-
   if( document.getElementById )
   {
-    elem = document.getElementById( id )
+    return document.getElementById( id )
   }
   else if ( document.all )
   {
-    elem = eval( 'document.all.' + id )
+    return eval( 'document.all.' + id )
   }
   else
     return false;
+}
 
-  elem.style.display = displayStyle
+function setDisplayStyle(id,displayStyle)
+{
+  var elem = getElem (id)
+  if (elem)
+  {
+    elem.style.display = displayStyle
+  }
 
+}
+
+function setLinkToggleText (id, text)
+{
+ var elem = getElem (id)
+ if (elem)
+ {
+   elem.innerHTML = text
+ }
 }
 
 function collapse(id)
@@ -83,40 +97,40 @@ function expand (id)
 
 function toggleSource( id )
 {
-  toggle(id, 'linkto-' + id, 'Show Source', 'Hide Source')
+  toggle(id, 'linkto-' + id, 'Hide Source', 'Show Source')
 }
 
 function toggle(targetid, linkid, textWhenOpen, textWhenClosed)
 {
-  var elem
-  var link
+  var elem = getElem (targetid)
+  var link = getElem (linkid)
 
-  if( document.getElementById )
+  if (elem && link)
   {
-    elem = document.getElementById( targetid )
-    link = document.getElementById( linkid )
-  }
-  else if ( document.all )
-  {
-    elem = eval( \"document.all.\" + targetid )
-    link = eval( \"document.all.\" + linkid )
-  }
-  else
-    return false;
-
-  if( elem.style.display == \"none\" )
-  {
-    elem.style.display = \"block\"
-    link.innerHTML = textWhenClosed
-  }
-  else
-  {
-    elem.style.display = \"none\"
-    link.innerHTML = textWhenOpen
+    var isOpen = false
+    if (elem.style.display == '')
+    {
+      isOpen = link.innerHTML == textWhenOpen
+    }
+    else if( elem.style.display == 'block' )
+    {
+      isOpen = true
+    }
+    
+    if (isOpen)
+    {
+      elem.style.display = 'none'
+      link.innerHTML = textWhenClosed
+    }
+    else
+    {
+      elem.style.display = 'block'
+      link.innerHTML = textWhenOpen
+    }
   }
 }
 
-      // ]]>
+      //]]>
 ")
 
 (def *style* "
@@ -287,11 +301,12 @@ visibility of the library contents."
   "Emits the HTML that documents the namespace identified by the
 symbol lib."
   [:div {:class "library"} 
+   [:a {:name (anchor-for-library lib)}]
    [:div {:class "library-name"} 
     [:span {:class "library-contents-toggle"} 
      "[ "
      [:a {:id (anchor-for-library-contents-toggle lib) 
-	  :href (format "javascript:toggle('%s', '%s', '+', '-')" 
+	  :href (format "javascript:toggle('%s', '%s', '-', '+')" 
 			(anchor-for-library-contents lib)
 			(anchor-for-library-contents-toggle lib))} 
       "-"]
@@ -338,15 +353,16 @@ vector of symbols naming namespaces."
 	   " ]"]]] 
 	(interpose " " (map generate-lib-link libs))))
 
-(defn generate-toggle-namespace-script [action lib]
-  (format "%s('%s');\n" action (anchor-for-library-contents lib)))
+(defn generate-toggle-namespace-script [action toggle-text lib]
+  (str (format "%s('%s');\n" action (anchor-for-library-contents lib))
+       (format "setLinkToggleText('%s', '%s');\n" (anchor-for-library-contents-toggle lib) toggle-text)))
 
-(defn generate-all-namespaces-action-script [action libs]
+(defn generate-all-namespaces-action-script [action toggle-text libs]
   (str (format  "function %sAllNamespaces()" action)
        \newline
        "{"
        \newline
-       (reduce str (map #(generate-toggle-namespace-script action %) libs))
+       (reduce str (map #(generate-toggle-namespace-script action toggle-text %) libs))
        \newline
        "}"))
 
@@ -364,13 +380,11 @@ libraries."
 	[:style *style*]
 	[:script {:language "JavaScript" :type "text/javascript"} [:raw! *script*]]
 	
-;; 	[:script {:language "JavaScript" :type "text/javascript"}
-;; 	 [:raw! "// <![CDATA[!" \newline]
-;; 	 (generate-all-namespaces-action-script "expand" libs)
-;; 	 (generate-all-namespaces-action-script "collapse" libs)
-;; 	 [:raw! \newline "// ]]>"]]
-
-]
+	[:script {:language "JavaScript" :type "text/javascript"}
+	 [:raw! "// <![CDATA[!" \newline]
+	 (generate-all-namespaces-action-script "expand" "-" libs)
+	 (generate-all-namespaces-action-script "collapse" "+" libs)
+	 [:raw! \newline "// ]]>"]]]
        (let [lib-vec (sort libs)] 
 	 (into [:body (generate-lib-links lib-vec)]
 	       (map generate-lib-doc lib-vec)))]))
