@@ -21,8 +21,9 @@
 
 ;; TODO
 ;; 
-;; * Add collapse/expand functionality for all namespaces
+;; * Remove doc strings from source code
 ;; * Add collapse/expand functionality for each namespace
+;; * Add collapse/expand functionality for all namespaces
 ;; * Move to clojure.contrib
 ;;   * Change namespace
 ;;   * Change license as appropriate
@@ -51,40 +52,57 @@
 
 (def *script* " // <![CDATA[
 
-        function toggleSource( id )
-        {
-          var elem
-          var link
+function toggleSource( id )
+{
+  toggle(id, 'linkto-' + id, 'Show Source', 'Hide Source')
+}
 
-          if( document.getElementById )
-          {
-            elem = document.getElementById( id )
-            link = document.getElementById( \"linkto-\" + id )
-          }
-          else if ( document.all )
-          {
-            elem = eval( \"document.all.\" + id )
-            link = eval( \"document.all.linkto-\" + id )
-          }
-          else
-            return false;
+function toggle(targetid, linkid, textWhenOpen, textWhenClosed)
+{
+  var elem
+  var link
 
-          if( elem.style.display == \"block\" )
-          {
-            elem.style.display = \"none\"
-            link.innerHTML = \"Show Source\"
-          }
-          else
-          {
-            elem.style.display = \"block\"
-            link.innerHTML = \"Hide Source\"
-          }
-        }
+  if( document.getElementById )
+  {
+    elem = document.getElementById( targetid )
+    link = document.getElementById( linkid )
+  }
+  else if ( document.all )
+  {
+    elem = eval( \"document.all.\" + targetid )
+    link = eval( \"document.all.\" + linkid )
+  }
+  else
+    return false;
+
+  if( elem.style.display == \"none\" )
+  {
+    elem.style.display = \"block\"
+    link.innerHTML = textWhenClosed
+  }
+  else
+  {
+    elem.style.display = \"none\"
+    link.innerHTML = textWhenOpen
+  }
+}
 
       // ]]>
 ")
 
-(def *style* ".library-member-doc-whitespace
+(def *style* ".library
+{
+  padding: 0.5em 0 0 0 
+}
+.library-contents-toggle
+{
+ font-size: small;
+}
+.library-contents-toggle a
+{
+ color: white
+}
+.library-member-doc-whitespace
 {
  white-space: pre
 }
@@ -219,28 +237,46 @@ suitable for use as the name attribute of an HTML anchor tag."
 
 (defn- generate-lib-member-link [libid [n v]]
   "Emits a hyperlink to a member of a namespace given libid (a symbol
-  identifying the namespace) and the vector [n v], where n is the
-  symbol naming the member in question and v is the var pointing to
-  the member." 
-  [:a
-   {:class "lib-member-link" :href (str "#" (anchor-for-member libid
-							       n))} (name n)])
+identifying the namespace) and the vector [n v], where n is the symbol
+naming the member in question and v is the var pointing to the
+member." 
+  [:a {:class "lib-member-link" 
+       :href (str "#" (anchor-for-member libid n))} (name n)])
+
+(defn- anchor-for-library-contents [lib]
+  "Returns an HTML ID that identifies the element that holds the
+  documentation contents for the specified library."
+  (str "library-contents-" lib))
+
+(defn- anchor-for-library-contents-toggle [lib]
+  "Returns an HTML ID that identifies the element that toggles the
+visibility of the library contents."
+  (str "library-contents-toggle-" lib))
 
 (defn- generate-lib-doc [lib]
   "Emits the HTML that documents the namespace identified by the
 symbol lib."
-  (let [ns (find-ns lib)]
-    (if ns 
-      (let [lib-members (sort (ns-publics ns))]
-	[:div {:class "library"}
+  [:div {:class "library"} 
+   [:div {:class "library-name"} 
+    [:span {:class "library-contents-toggle"} 
+     "[ "
+     [:a {:id (anchor-for-library-contents-toggle lib) 
+	  :href (format "javascript:toggle('%s', '%s', '+', '-')" 
+			(anchor-for-library-contents lib)
+			(anchor-for-library-contents-toggle lib))} 
+      "-"]
+     " ] "]
+    (name lib)]
+   (let [ns (find-ns lib)]
+     (if ns 
+       (let [lib-members (sort (ns-publics ns))]
 	 [:a {:name (anchor-for-library lib)}]
-	 [:div {:class "library-name"} (str (ns-name ns))]
-	 (into [:div {:class "library-member-links"}]
-	       (interpose " " (map #(generate-lib-member-link lib %) lib-members)))
-	 (into [:ol {:class "library-members"}]
-	       (map #(generate-lib-member lib %) lib-members))])
-      [:div {:class "missing-library"}
-        [:div {:class "library-name"} (name lib)] "Could not load library"])))
+	 [:div {:class "library-contents" :id (anchor-for-library-contents lib)}
+	  (into [:div {:class "library-member-links"}]
+		(interpose " " (map #(generate-lib-member-link lib %) lib-members)))
+	  (into [:ol {:class "library-members"}]
+		(map #(generate-lib-member lib %) lib-members))])
+       [:div {:class "missing-library library-contents" :id (anchor-for-library-contents lib)} "Could not load library"]))])
 
 (defn- load-lib [lib]
   "Calls require on the library identified by lib, eating any
@@ -293,71 +329,72 @@ emits the generated HTML to the path named by path."
    "C:/TEMP/CLJ-DOCS.HTML"
    ['clojure.contrib.accumulators])
 
-  (generate-documentation-to-file 
-   "C:/temp/clj-libs.html"
-   [
-    'clojure.set
-    'clojure.main 
-    'clojure.core  
-    'clojure.zip   
-    'clojure.xml
-    'clojure.contrib.accumulators
-    'clojure.contrib.apply-macro
-    'clojure.contrib.auto-agent
-    'clojure.contrib.combinatorics
-    'clojure.contrib.command-line
-    'clojure.contrib.cond
-    'clojure.contrib.condt
-    'clojure.contrib.def
-    'clojure.contrib.duck-streams
-    'clojure.contrib.enum
-    'clojure.contrib.error-kit
-    'clojure.contrib.except
-    'clojure.contrib.fcase
-    'clojure.contrib.import-static
-    'clojure.contrib.javadoc
-    'clojure.contrib.javalog
-    'clojure.contrib.lazy-seqs
-    'clojure.contrib.lazy-xml
-    'clojure.contrib.macros
-    'clojure.contrib.math
-    'clojure.contrib.miglayout
-    'clojure.contrib.mmap
-    'clojure.contrib.monads
-    'clojure.contrib.ns-utils
-    'clojure.contrib.prxml
-    'clojure.contrib.repl-ln
-    'clojure.contrib.repl-utils
-    'clojure.contrib.seq-utils
-    'clojure.contrib.server-socket
-    'clojure.contrib.shell-out
-    'clojure.contrib.sql
-    'clojure.contrib.stacktrace
-    'clojure.contrib.stream-utils
-    'clojure.contrib.str-utils
-    'clojure.contrib.template
-    'clojure.contrib.test-clojure
-    'clojure.contrib.test-contrib
-    'clojure.contrib.test-is
-    'clojure.contrib.trace
-    'clojure.contrib.walk
-    'clojure.contrib.zip-filter
-    'clojure.contrib.javadoc.browse
-    'clojure.contrib.json.read
-    'clojure.contrib.json.write
-    'clojure.contrib.lazy-xml.with-pull
-    'clojure.contrib.miglayout.internal
-    'clojure.contrib.probabilities.dist
-    'clojure.contrib.probabilities.dist.examples
-    'clojure.contrib.sql.internal
-    'clojure.contrib.test-clojure.evaluation
-    'clojure.contrib.test-clojure.for
-    'clojure.contrib.test-clojure.numbers
-    'clojure.contrib.test-clojure.printer
-    'clojure.contrib.test-clojure.reader
-    'clojure.contrib.test-clojure.sequences
-    'clojure.contrib.test-contrib.shell-out
-    'clojure.contrib.test-contrib.str-utils
-    'clojure.contrib.zip-filter.xml
-    ])
+  (defn gen-all-docs [] 
+    (generate-documentation-to-file 
+     "C:/temp/clj-libs.html"
+     [
+     'clojure.set
+     'clojure.main 
+     'clojure.core  
+     'clojure.zip   
+     'clojure.xml
+     'clojure.contrib.accumulators
+     'clojure.contrib.apply-macro
+     'clojure.contrib.auto-agent
+     'clojure.contrib.combinatorics
+     'clojure.contrib.command-line
+     'clojure.contrib.cond
+     'clojure.contrib.condt
+     'clojure.contrib.def
+     'clojure.contrib.duck-streams
+     'clojure.contrib.enum
+     'clojure.contrib.error-kit
+     'clojure.contrib.except
+     'clojure.contrib.fcase
+     'clojure.contrib.import-static
+     'clojure.contrib.javadoc
+     'clojure.contrib.javalog
+     'clojure.contrib.lazy-seqs
+     'clojure.contrib.lazy-xml
+     'clojure.contrib.macros
+     'clojure.contrib.math
+     'clojure.contrib.miglayout
+     'clojure.contrib.mmap
+     'clojure.contrib.monads
+     'clojure.contrib.ns-utils
+     'clojure.contrib.prxml
+     'clojure.contrib.repl-ln
+     'clojure.contrib.repl-utils
+     'clojure.contrib.seq-utils
+     'clojure.contrib.server-socket
+     'clojure.contrib.shell-out
+     'clojure.contrib.sql
+     'clojure.contrib.stacktrace
+     'clojure.contrib.stream-utils
+     'clojure.contrib.str-utils
+     'clojure.contrib.template
+     'clojure.contrib.test-clojure
+     'clojure.contrib.test-contrib
+     'clojure.contrib.test-is
+     'clojure.contrib.trace
+     'clojure.contrib.walk
+     'clojure.contrib.zip-filter
+     'clojure.contrib.javadoc.browse
+     'clojure.contrib.json.read
+     'clojure.contrib.json.write
+     'clojure.contrib.lazy-xml.with-pull
+     'clojure.contrib.miglayout.internal
+     'clojure.contrib.probabilities.dist
+     'clojure.contrib.probabilities.dist.examples
+     'clojure.contrib.sql.internal
+     'clojure.contrib.test-clojure.evaluation
+     'clojure.contrib.test-clojure.for
+     'clojure.contrib.test-clojure.numbers
+     'clojure.contrib.test-clojure.printer
+     'clojure.contrib.test-clojure.reader
+     'clojure.contrib.test-clojure.sequences
+     'clojure.contrib.test-contrib.shell-out
+     'clojure.contrib.test-contrib.str-utils
+     'clojure.contrib.zip-filter.xml
+     ]))
   )
