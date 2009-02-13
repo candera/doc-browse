@@ -246,17 +246,25 @@ function toggle(targetid, linkid, textWhenOpen, textWhenClosed)
 (defn- symbol-for [ns memberid]
   (symbol (name (ns-name ns)) (name memberid)))
 
-(defn- elide-string [s limit]
+(defn- elide-to-one-line [s]
+  (re-sub #"(\n.*)+" "..." s))
+
+(defn- elide-string 
   "Returns a string that is at most the first limit characters of s"
+  [s limit]
   (if (< (- limit 3) (count s))
     (str (subs s 0 (- limit 3)) "...")
     s))
 
-(defn- doc-elided-src [docs src]
+(defn- doc-elided-src 
   "Returns the src with the docs elided."
+  [docs src]
   (re-sub (re-pattern (str "\"" (Pattern/quote docs) "\"")) 
-;;	  (str "\"" (elide-string docs 10) "\"") 
-	  "\"...\""
+	  (str "\""
+		  (elide-to-one-line docs)
+;; 	          (elide-string docs 10)
+;;	          "..."
+		  "\"")
 	  src))
 
 (defn- format-source [libid memberid v]
