@@ -21,8 +21,6 @@
 
 ;; TODO
 ;; 
-;; * Remove doc strings from source code
-;; * Add collapse/expand functionality for all namespaces
 ;; * Move to clojure.contrib
 ;;   * Change namespace
 ;;   * Change license as appropriate
@@ -30,6 +28,8 @@
 ;;
 ;; DONE
 ;;
+;; * Remove doc strings from source code
+;; * Add collapse/expand functionality for all namespaces
 ;; * Add collapse/expand functionality for each namespace
 ;; * See if converting to use clojure.contrib.prxml is possible
 ;; * Figure out why the source doesn't show up for most things
@@ -44,7 +44,8 @@
 (ns com.wangdera.doc-browse.core
   (:require [clojure.contrib.duck-streams :as duck-streams])
   (:use [clojure.contrib seq-utils str-utils repl-utils def prxml])
-  (:import [java.lang Exception]))
+  (:import [java.lang Exception]
+	   [java.util.regex Pattern]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Doc generation constants
@@ -236,17 +237,36 @@ function toggle(targetid, linkid, textWhenOpen, textWhenClosed)
 (defn- anchor-for-member [libid memberid]
   (str "member-" libid "-" memberid))
 
-
 (defn- id-for-member-source [libid memberid]
   (str "membersource-" libid "-" memberid))
 
 (defn- id-for-member-source-link [libid memberid]
   (str "linkto-membersource-" libid "-" memberid))
 
-(defn- format-source [libid memberid]
+(defn- symbol-for [ns memberid]
+  (symbol (name (ns-name ns)) (name memberid)))
+
+(defn- elide-string [s limit]
+  "Returns a string that is at most the first limit characters of s"
+  (if (< (- limit 3) (count s))
+    (str (subs s 0 (- limit 3)) "...")
+    s))
+
+(defn- doc-elided-src [docs src]
+  "Returns the src with the docs elided."
+  (re-sub (re-pattern (str "\"" (Pattern/quote docs) "\"")) 
+;;	  (str "\"" (elide-string docs 10) "\"") 
+	  "\"...\""
+	  src))
+
+(defn- format-source [libid memberid v]
   (try
-   (if-let [ns (find-ns libid)]
-     (get-source (symbol (name (ns-name ns)) (name memberid))))
+   (let [docs (:doc (meta v)) 
+	 src (if-let [ns (find-ns libid)]
+	       (get-source (symbol-for ns memberid)))]
+     (if (and src docs)
+       (doc-elided-src docs src)
+       src))
    (catch Exception ex
      nil)))
 
@@ -263,8 +283,8 @@ function toggle(targetid, linkid, textWhenOpen, textWhenClosed)
       [:span {:class "library-member-arglists"} (str (:arglists (meta v)))]]
      (into [:div {:class "library-member-docs"}] (extract-documentation v))
      (let [member-source-id (id-for-member-source libid n)
-	      member-source-link-id (id-for-member-source-link libid n)]
-       (if-let [member-source (format-source libid n)] 
+	   member-source-link-id (id-for-member-source-link libid n)]
+       (if-let [member-source (format-source libid n v)] 
 	 [:div {:class "library-member-source-section"}
 	  [:div {:class "library-member-source-toggle"}
 	   "[ "
