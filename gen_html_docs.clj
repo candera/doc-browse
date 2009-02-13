@@ -1,33 +1,31 @@
-;; Copyright (c) 2009 Wangdera Corporation candera@wangdera.com
+;;; gen-html-docs.clj: Generate HTML documentation for Clojure libs
 
-;; Permission is hereby granted, free of charge, to any person obtaining
-;; a copy of this software and associated documentation
-;; files (the "Software"), to deal in the Software without restriction,
-;; including without limitation the rights to use, copy, modify, merge,
-;; publish, distribute, sublicense, and/or sell copies of the Software,
-;; and to permit persons to whom the Software is furnished to do so,
-;; subject to the following conditions:
+;; by Craig Andera, http://pluralsight.com/craig, candera@wangdera.com
+;; February 13th, 2009
 
-;; The above copyright notice and this permission notice shall be
-;; included in all copies or substantial portions of the Software.
+;; Copyright (c) Craig Andera, 2009. All rights reserved.  The use
+;; and distribution terms for this software are covered by the Eclipse
+;; Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php)
+;; which can be found in the file epl-v10.html at the root of this
+;; distribution.  By using this software in any fashion, you are
+;; agreeing to be bound by the terms of this license.  You must not
+;; remove this notice, or any other, from this software.
 
-;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-;; EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-;; MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-;; IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-;; CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-;; TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-;; SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+;; Generates a single HTML page that contains the documentation for
+;; one or more Clojure libraries. See the comments section at the end
+;; of this file for usage.
 
 ;; TODO
 ;; 
+;; * Make symbols in the source hyperlinks to the appropriate section
+;;   of the documentation.
+;;
+;; DONE
+;;
 ;; * Move to clojure.contrib
 ;;   * Change namespace
 ;;   * Change license as appropriate
 ;;   * Double-check doc strings
-;;
-;; DONE
-;;
 ;; * Remove doc strings from source code
 ;; * Add collapse/expand functionality for all namespaces
 ;; * Add collapse/expand functionality for each namespace
@@ -41,7 +39,7 @@
 ;; * Add license statement
 ;; * Remove the whojure dependency
 
-(ns com.wangdera.doc-browse.core
+(ns clojure.contrib.gen-html-docs
   (:require [clojure.contrib.duck-streams :as duck-streams])
   (:use [clojure.contrib seq-utils str-utils repl-utils def prxml])
   (:import [java.lang Exception]
@@ -212,7 +210,9 @@ function toggle(targetid, linkid, textWhenOpen, textWhenClosed)
   font-size: 105%
 }")
 
-(defn- extract-documentation [v]
+(defn- extract-documentation 
+  "Pulls the documentation for a var v out and turns it into HTML"
+  [v]
   (if-let [docs (:doc (meta v))]
     (map 
      (fn [l] 
@@ -223,7 +223,9 @@ function toggle(targetid, linkid, textWhenOpen, textWhenClosed)
      (re-split #"\n" docs)) 
     ""))
 
-(defn- member-type [x]
+(defn- member-type 
+  "Figures out for a var x whether it's a macro, function, var or multifunction"
+  [x]
   (try 
    (let [dx (deref x)] 
      (cond 
@@ -234,19 +236,34 @@ function toggle(targetid, linkid, textWhenOpen, textWhenClosed)
    (catch Exception e
      :unknown)))
 
-(defn- anchor-for-member [libid memberid]
+(defn- anchor-for-member 
+  "Returns a suitable HTML anchor name given a library id and a member
+  id" 
+  [libid memberid]
   (str "member-" libid "-" memberid))
 
-(defn- id-for-member-source [libid memberid]
+(defn- id-for-member-source 
+  "Returns a suitable HTML id for a source listing given a library and
+  a member"
+  [libid memberid]
   (str "membersource-" libid "-" memberid))
 
-(defn- id-for-member-source-link [libid memberid]
+(defn- id-for-member-source-link 
+  "Returns a suitable HTML id for a link to a source listing given a
+  library and a member"
+  [libid memberid]
   (str "linkto-membersource-" libid "-" memberid))
 
-(defn- symbol-for [ns memberid]
+(defn- symbol-for 
+  "Given a namespace object ns and a namespaceless symbol memberid
+  naming a member of that namespace, returns a namespaced symbol that
+  identifies that member."
+  [ns memberid]
   (symbol (name (ns-name ns)) (name memberid)))
 
-(defn- elide-to-one-line [s]
+(defn- elide-to-one-line 
+  "Elides a string down to one line."
+  [s]
   (re-sub #"(\n.*)+" "..." s))
 
 (defn- elide-string 
@@ -302,32 +319,37 @@ function toggle(targetid, linkid, textWhenOpen, textWhenClosed)
 	  [:div {:class "library-member-source" :id member-source-id}
 	   [:pre member-source]]]))]]])
 
-(defn- anchor-for-library [id]
+(defn- anchor-for-library 
   "Given a symbol id identifying a namespace, returns an identifier
 suitable for use as the name attribute of an HTML anchor tag."
+  [id]
   (str "library-" id))
 
-(defn- generate-lib-member-link [libid [n v]]
+(defn- generate-lib-member-link 
   "Emits a hyperlink to a member of a namespace given libid (a symbol
 identifying the namespace) and the vector [n v], where n is the symbol
 naming the member in question and v is the var pointing to the
 member." 
+  [libid [n v]]
   [:a {:class "lib-member-link" 
        :href (str "#" (anchor-for-member libid n))} (name n)])
 
-(defn- anchor-for-library-contents [lib]
+(defn- anchor-for-library-contents 
   "Returns an HTML ID that identifies the element that holds the
-  documentation contents for the specified library."
+documentation contents for the specified library."
+  [lib]
   (str "library-contents-" lib))
 
-(defn- anchor-for-library-contents-toggle [lib]
+(defn- anchor-for-library-contents-toggle 
   "Returns an HTML ID that identifies the element that toggles the
 visibility of the library contents."
+  [lib]
   (str "library-contents-toggle-" lib))
 
-(defn- generate-lib-doc [lib]
+(defn- generate-lib-doc 
   "Emits the HTML that documents the namespace identified by the
 symbol lib."
+  [lib]
   [:div {:class "library"} 
    [:a {:name (anchor-for-library lib)}]
    [:div {:class "library-name"} 
@@ -351,24 +373,27 @@ symbol lib."
 		(map #(generate-lib-member lib %) lib-members))])
        [:div {:class "missing-library library-contents" :id (anchor-for-library-contents lib)} "Could not load library"]))])
 
-(defn- load-lib [lib]
+(defn- load-lib 
   "Calls require on the library identified by lib, eating any
 exceptions."
+  [lib]
   (try 
    (require lib)
    (catch java.lang.Exception x
        nil)))
 
-(defn- generate-lib-link [lib]
+(defn- generate-lib-link 
   "Generates a hyperlink to the documentation for a namespace given
 lib, a symbol identifying that namespace."
+  [lib]
   (let [ns (find-ns lib)]
     (if ns
       [:a {:class "lib-link" :href (str "#" (anchor-for-library lib))} (str (ns-name ns))])))
 
-(defn- generate-lib-links [libs]
+(defn- generate-lib-links 
   "Generates the list of hyperlinks to each namespace, given libs, a
 vector of symbols naming namespaces."
+  [libs]
   (into [:div {:class "lib-links"} 
 	 [:div {:class "lib-link-header"} "Namespaces"
 	  [:span {:class "all-libs-toggle"} 
@@ -381,11 +406,13 @@ vector of symbols naming namespaces."
 	   " ]"]]] 
 	(interpose " " (map generate-lib-link libs))))
 
-(defn generate-toggle-namespace-script [action toggle-text lib]
+(defn generate-toggle-namespace-script 
+  [action toggle-text lib]
   (str (format "%s('%s');\n" action (anchor-for-library-contents lib))
        (format "setLinkToggleText('%s', '%s');\n" (anchor-for-library-contents-toggle lib) toggle-text)))
 
-(defn generate-all-namespaces-action-script [action toggle-text libs]
+(defn generate-all-namespaces-action-script 
+  [action toggle-text libs]
   (str (format  "function %sAllNamespaces()" action)
        \newline
        "{"
@@ -394,10 +421,11 @@ vector of symbols naming namespaces."
        \newline
        "}"))
 
-(defn generate-documentation [libs]
+(defn generate-documentation 
   "Returns a string which is the HTML documentation for the libraries
 named by libs. Libs is a vector of symbols identifying Clojure
 libraries."
+  [libs]
   (dorun (map load-lib libs))
   (let [writer (new java.io.StringWriter)]
    (binding [*out* writer] 
@@ -419,9 +447,10 @@ libraries."
    (.toString writer)))
 
 
-(defn generate-documentation-to-file [path libs]
+(defn generate-documentation-to-file 
   "Calls generate-documentation on the libraries named by libs and
 emits the generated HTML to the path named by path."
+  [path libs]
   (duck-streams/spit path (generate-documentation libs)))
 
 (comment 
