@@ -19,6 +19,8 @@
 ;; 
 ;; * Make symbols in the source hyperlinks to the appropriate section
 ;;   of the documentation.
+;; * Investigate issue with miglayout mentioned here: 
+;;   http://groups.google.com/group/clojure/browse_thread/thread/5a0c4395e44f5a79/3ae483100366bd3d?lnk=gst&q=documentation+browser#3ae483100366bd3d
 ;;
 ;; DONE
 ;;
